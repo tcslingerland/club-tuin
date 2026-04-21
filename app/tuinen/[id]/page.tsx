@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { GardenCanvas } from "@/components/GardenCanvas";
 import Link from "next/link";
 
 export default async function GardenDetailPage({
@@ -33,7 +34,27 @@ export default async function GardenDetailPage({
     .select("*")
     .eq("garden_id", id);
 
+  const { data: shapes } = await supabase
+    .from("garden_shapes")
+    .select("*")
+    .eq("garden_id", id);
+
   const plantCount = placements?.length ?? 0;
+
+  const initialShapes = (shapes ?? []).map(s => ({
+    id: s.id as string,
+    type: s.type as "boundary" | "zone",
+    zone_type: (s.zone_type ?? undefined) as "zon" | "halfschaduw" | "schaduw" | undefined,
+    points: JSON.parse(s.svg_path) as { x: number; y: number }[],
+  }));
+
+  const initialPlacements = (placements ?? []).map(p => ({
+    id: p.id as string,
+    plant_id: p.plant_id as number,
+    x: Number(p.x),
+    y: Number(p.y),
+    in_pot: (p.in_pot ?? false) as boolean,
+  }));
 
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-8 space-y-6">
@@ -91,54 +112,8 @@ export default async function GardenDetailPage({
         </Card>
       </div>
 
-      {/* Canvas placeholder */}
-      <Card>
-        <CardContent className="py-12 text-center">
-          <span className="text-4xl block mb-3">⌂</span>
-          <p className="text-[var(--color-text-muted)] text-sm mb-4">
-            Tuinkaart komt hier — sleep planten op de kaart
-          </p>
-          <Button variant="outline" disabled>
-            Canvas — binnenkort beschikbaar
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Plants */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-display text-lg text-[var(--color-text)] dark:text-[var(--color-text-dark)]">
-            Planten
-          </h2>
-          <Link href="/planten">
-            <Button size="sm">+ Plant toevoegen</Button>
-          </Link>
-        </div>
-
-        {plantCount === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <span className="text-3xl block mb-2">✿</span>
-              <p className="text-sm text-[var(--color-text-muted)]">
-                Nog geen planten in deze tuin
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {placements!.map((p) => (
-              <Card key={p.id}>
-                <CardContent className="py-3 flex items-center justify-between">
-                  <p className="text-sm font-medium">Plant #{p.plant_id ?? p.custom_plant_id}</p>
-                  <span className="text-xs text-[var(--color-text-muted)]">
-                    {p.in_pot ? "🪴 pot" : "🌍 grond"}
-                  </span>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Canvas */}
+      <GardenCanvas gardenId={id} initialShapes={initialShapes} initialPlacements={initialPlacements} />
     </div>
   );
 }
