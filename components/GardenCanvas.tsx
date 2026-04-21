@@ -33,6 +33,33 @@ function pts(points: Point[]) {
   return points.map(p => `${p.x},${p.y}`).join(" ");
 }
 
+const SCHAAL = 100; // 100px = 1 meter
+
+function AfmetingLabel({ a, b, preview = false }: { a: Point; b: Point; preview?: boolean }) {
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  if (dist < 10) return null;
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const meter = (dist / SCHAAL).toFixed(1);
+  const label = `${meter} m`;
+  let hoek = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+  if (hoek > 90 || hoek < -90) hoek += 180;
+  const bw = label.length * 5.5 + 10;
+  const bh = 14;
+  return (
+    <g transform={`rotate(${hoek},${mx},${my})`} pointerEvents="none">
+      <rect x={mx - bw / 2} y={my - bh / 2} width={bw} height={bh} rx={4}
+        fill={preview ? "rgba(77,122,66,0.15)" : "rgba(255,255,255,0.92)"}
+        stroke="#4D7A42" strokeWidth="0.8" />
+      <text x={mx} y={my} textAnchor="middle" dominantBaseline="central"
+        fontSize="9.5" fontWeight="700" fill="#4D7A42"
+        style={{ userSelect: "none" }}>
+        {label}
+      </text>
+    </g>
+  );
+}
+
 function inPolygon(pt: Point, poly: Point[]) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -307,8 +334,14 @@ export function GardenCanvas({
 
           {/* Garden boundary */}
           {closed && (
-            <polygon points={pts(boundaryPts)} fill="#c8e89a" fillOpacity="0.45"
-              stroke="#5a9a30" strokeWidth="2.5" pointerEvents="none" />
+            <>
+              <polygon points={pts(boundaryPts)} fill="#c8e89a" fillOpacity="0.45"
+                stroke="#5a9a30" strokeWidth="2.5" pointerEvents="none" />
+              {boundaryPts.map((p, i) => {
+                const next = boundaryPts[(i + 1) % boundaryPts.length];
+                return <AfmetingLabel key={i} a={p} b={next} />;
+              })}
+            </>
           )}
 
           {/* Boundary drawing preview */}
@@ -322,6 +355,11 @@ export function GardenCanvas({
                 <circle key={i} cx={p.x} cy={p.y} r={i === 0 ? 8 : 4}
                   fill={i === 0 ? "#5a9a30" : "white"} stroke="#5a9a30" strokeWidth="2" pointerEvents="none" />
               ))}
+              {boundaryPts.map((p, i) => {
+                const next = i < boundaryPts.length - 1 ? boundaryPts[i + 1] : mouse;
+                if (!next) return null;
+                return <AfmetingLabel key={i} a={p} b={next} preview={i === boundaryPts.length - 1} />;
+              })}
             </>
           )}
 
