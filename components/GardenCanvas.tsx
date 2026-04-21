@@ -70,6 +70,7 @@ export function GardenCanvas({
 
   const [selectedPlant, setSelectedPlant] = useState<number | null>(null);
   const [plantSearch, setPlantSearch] = useState("");
+  const [selectedPlacementId, setSelectedPlacementId] = useState<string | null>(null);
 
   const drag = useRef<{ id: string; ox: number; oy: number; sx: number; sy: number; moved: boolean } | null>(null);
 
@@ -106,6 +107,7 @@ export function GardenCanvas({
 
   function handleClick(e: React.MouseEvent) {
     if (drag.current?.moved) return;
+    setSelectedPlacementId(null);
     const c = svgCoords(e);
 
     if (mode === "teken" && !closed) {
@@ -168,9 +170,24 @@ export function GardenCanvas({
     drag.current = { id: p.id, ox: p.x, oy: p.y, sx: c.x, sy: c.y, moved: false };
   }
 
+  function handlePlantClick(e: React.MouseEvent, p: Placement) {
+    e.stopPropagation();
+    if (drag.current?.moved) return;
+    setSelectedPlacementId(prev => prev === p.id ? null : p.id);
+  }
+
   async function removePlacement(id: string) {
     await supabase.from("plant_placements").delete().eq("id", id);
     setPlacements(prev => prev.filter(p => p.id !== id));
+    setSelectedPlacementId(null);
+  }
+
+  async function toggleInPot(id: string) {
+    const p = placements.find(pl => pl.id === id);
+    if (!p) return;
+    const newVal = !p.in_pot;
+    setPlacements(prev => prev.map(pl => pl.id === id ? { ...pl, in_pot: newVal } : pl));
+    await supabase.from("plant_placements").update({ in_pot: newVal }).eq("id", id);
   }
 
   function undo() {
@@ -193,8 +210,8 @@ export function GardenCanvas({
     mode === "zon" ? "Klik op het startpunt ● om te sluiten" :
     mode === "plant" && !selectedPlant ? "Selecteer een plant hieronder" :
     mode === "plant" && !closed ? "Teken eerst de tuingrens" :
-    mode === "plant" ? "Klik in de tuin om te plaatsen · dubbelklik op plant om te verwijderen" :
-    "Dubbelklik op een plant om te verwijderen";
+    mode === "plant" ? "Klik in de tuin om te plaatsen · klik op plant voor opties" :
+    "Klik op een plant voor pot-toggle of verwijderen";
 
   const btnBase = "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border";
   const btnActive = "bg-[var(--color-accent-primary)] text-white border-[var(--color-accent-primary)]";
@@ -313,16 +330,50 @@ export function GardenCanvas({
             const plant = plantenDb.find(pl => pl.id === p.plant_id);
             if (!plant) return null;
             const hasTask = (plant.v[currentMonth as keyof typeof plant.v]?.length ?? 0) > 0;
+            const selected = selectedPlacementId === p.id;
             return (
               <g key={p.id} transform={`translate(${p.x},${p.y})`} style={{ cursor: "grab" }}
                 onMouseDown={e => handlePlantMouseDown(e, p)}
-                onDoubleClick={e => { e.stopPropagation(); removePlacement(p.id); }}
+                onClick={e => handlePlantClick(e, p)}
               >
                 <circle r={17} fill={p.in_pot ? "#FDF0EA" : "white"}
-                  stroke={p.in_pot ? "#D4784A" : "#5a9a30"} strokeWidth="2" filter="url(#pshadow)" />
+                  stroke={selected ? "#2563eb" : p.in_pot ? "#D4784A" : "#5a9a30"}
+                  strokeWidth={selected ? 3 : 2} filter="url(#pshadow)" />
                 <text textAnchor="middle" dominantBaseline="central" fontSize="13"
                   style={{ userSelect: "none", pointerEvents: "none" }}>{plant.emoji}</text>
                 {hasTask && <circle cx={12} cy={-12} r={5} fill="#e85d04" pointerEvents="none" />}
+                {p.in_pot && <text x={-17} y={17} fontSize="9" style={{ userSelect: "none", pointerEvents: "none" }}>🪴</text>}
+
+                {/* Popover */}
+                {selected && (
+                  <g transform="translate(20,-40)" style={{ pointerEvents: "auto" }}>
+                    <rect x={0} y={0} width={110} height={52} rx={8}
+                      fill="white" stroke="#e5e7eb" strokeWidth="1"
+                      filter="url(#pshadow)" />
+                    <text x={8} y={16} fontSize="10" fontWeight="600" fill="#111"
+                      style={{ userSelect: "none", pointerEvents: "none" }}>
+                      {plant.naam}
+                    </text>
+                    {/* Pot toggle */}
+                    <g onClick={e => { e.stopPropagation(); toggleInPot(p.id); }} style={{ cursor: "pointer" }}>
+                      <rect x={6} y={22} width={46} height={22} rx={5}
+                        fill={p.in_pot ? "#FDF0EA" : "#f0fdf4"} stroke={p.in_pot ? "#D4784A" : "#5a9a30"} strokeWidth="1" />
+                      <text x={29} y={37} textAnchor="middle" fontSize="10" fill={p.in_pot ? "#D4784A" : "#5a9a30"}
+                        style={{ userSelect: "none", pointerEvents: "none" }}>
+                        {p.in_pot ? "🪴 Pot" : "🌍 Grond"}
+                      </text>
+                    </g>
+                    {/* Delete */}
+                    <g onClick={e => { e.stopPropagation(); removePlacement(p.id); }} style={{ cursor: "pointer" }}>
+                      <rect x={58} y={22} width={46} height={22} rx={5}
+                        fill="#fff5f5" stroke="#fca5a5" strokeWidth="1" />
+                      <text x={81} y={37} textAnchor="middle" fontSize="10" fill="#dc2626"
+                        style={{ userSelect: "none", pointerEvents: "none" }}>
+                        ✕ Weg
+                      </text>
+                    </g>
+                  </g>
+                )}
               </g>
             );
           })}

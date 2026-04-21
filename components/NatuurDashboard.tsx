@@ -286,6 +286,53 @@ export function NatuurDashboard({
               </p>
             )}
           </div>
+
+          {/* Winterprofiel */}
+          {(() => {
+            const wintergroen = planten.filter(p => p.wg === "wintergroen");
+            const halfwinter = planten.filter(p => p.wg === "halfwintergroen");
+            const bladverliezen = planten.filter(p => p.wg === "bladverliezen");
+            const bessen = planten.filter(p => p.eco.bes === 1);
+
+            const groepen = [
+              { label: "Wintergroen", icon: "🌲", kleur: "#2D7A4D", bg: "#f0fdf4", border: "#86efac", items: wintergroen },
+              { label: "Halfwintergroen", icon: "🌿", kleur: "#5a9a30", bg: "#f7fee7", border: "#bef264", items: halfwinter },
+              { label: "Bladverliezen", icon: "🍂", kleur: "#92400e", bg: "#fef3c7", border: "#fcd34d", items: bladverliezen },
+              { label: "Winterbessen", icon: "🍒", kleur: "#be123c", bg: "#fff1f2", border: "#fda4af", items: bessen },
+            ].filter(g => g.items.length > 0);
+
+            if (groepen.length === 0) return null;
+
+            return (
+              <div className="rounded-xl border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] p-5">
+                <h2 className="font-display text-lg text-[var(--color-text)] dark:text-[var(--color-text-dark)] mb-4">
+                  Winterprofiel
+                </h2>
+                <div className="space-y-3">
+                  {groepen.map(g => (
+                    <div key={g.label}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span>{g.icon}</span>
+                        <span className="text-sm font-medium" style={{ color: g.kleur }}>{g.label}</span>
+                        <span className="text-xs text-[var(--color-text-muted)]">({g.items.length})</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {g.items.map(p => (
+                          <span
+                            key={p.id}
+                            className="flex items-center gap-1 text-xs px-2 py-1 rounded-full border"
+                            style={{ backgroundColor: g.bg, borderColor: g.border, color: g.kleur }}
+                          >
+                            {p.emoji} {p.naam}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </>
       )}
     </div>
