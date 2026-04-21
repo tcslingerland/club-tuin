@@ -7,6 +7,90 @@ import { berekenBiodiversiteit, biodivKleur } from "@/lib/biodiversiteit";
 
 const MAANDEN = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
 
+const MAAND_KLEUREN = [
+  "#9C7CC0","#E891A0","#8BC34A","#F48FB1",
+  "#CDDC39","#FF8A65","#EF5350","#FFA726",
+  "#D4A558","#AB7A4B","#7986CB","#5C6BC0",
+];
+
+function BloeiGrafiek({ data, huidigeMaand }: { data: number[]; huidigeMaand: number }) {
+  const W = 600, H = 110, PAD = { top: 12, right: 16, bottom: 24, left: 20 };
+  const maxVal = Math.max(...data, 1);
+  const step = (W - PAD.left - PAD.right) / 11;
+
+  const pts = data.map((v, i) => ({
+    x: PAD.left + i * step,
+    y: PAD.top + (1 - v / maxVal) * (H - PAD.top - PAD.bottom),
+  }));
+
+  // Smooth bezier path
+  function bezierPath(points: { x: number; y: number }[]) {
+    if (points.length < 2) return "";
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1], curr = points[i];
+      const prevPrev = points[i - 2] ?? prev;
+      const next = points[i + 1] ?? curr;
+      const cp1x = prev.x + (curr.x - prevPrev.x) / 6;
+      const cp1y = prev.y + (curr.y - prevPrev.y) / 6;
+      const cp2x = curr.x - (next.x - prev.x) / 6;
+      const cp2y = curr.y - (next.y - prev.y) / 6;
+      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
+    }
+    return d;
+  }
+
+  const linePath = bezierPath(pts);
+  const areaPath = linePath
+    + ` L ${pts[pts.length - 1].x} ${H - PAD.bottom}`
+    + ` L ${pts[0].x} ${H - PAD.bottom} Z`;
+
+  const huidigX = PAD.left + (huidigeMaand - 1) * step;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 110 }}>
+      <defs>
+        <linearGradient id="bloeiGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#5a9a30" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="#5a9a30" stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+
+      {/* Area fill */}
+      <path d={areaPath} fill="url(#bloeiGrad)" />
+
+      {/* Line */}
+      <path d={linePath} fill="none" stroke="#5a9a30" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Current month line */}
+      <line
+        x1={huidigX} y1={PAD.top - 4}
+        x2={huidigX} y2={H - PAD.bottom}
+        stroke="var(--color-accent-primary, #5a9a30)"
+        strokeWidth="1.5" strokeDasharray="4,3" opacity="0.5"
+      />
+
+      {/* Dots + month labels */}
+      {pts.map((p, i) => (
+        <g key={i}>
+          <circle cx={p.x} cy={p.y} r={data[i] === 0 ? 3 : 5}
+            fill={MAAND_KLEUREN[i]} stroke="white" strokeWidth="1.5" />
+          {data[i] > 0 && (
+            <text x={p.x} y={p.y - 8} textAnchor="middle" fontSize="9" fill={MAAND_KLEUREN[i]} fontWeight="600">
+              {data[i]}
+            </text>
+          )}
+          <text x={p.x} y={H - 4} textAnchor="middle" fontSize="9"
+            fill={i + 1 === huidigeMaand ? "#5a9a30" : "#9ca3af"}
+            fontWeight={i + 1 === huidigeMaand ? "700" : "400"}>
+            {MAANDEN[i].slice(0, 1)}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 const HEATMAP_KLEUREN = (n: number) => {
   if (n === 0) return "bg-[#EDEAE4] dark:bg-[#2a2a2a]";
   if (n <= 2) return "bg-[#D8E8D8]";
@@ -151,6 +235,11 @@ export function NatuurDashboard({
                   <span className="text-[9px] text-[var(--color-text-muted)]">{m}</span>
                 </div>
               ))}
+            </div>
+
+            {/* Lijngrafieklijn */}
+            <div className="mb-4">
+              <BloeiGrafiek data={bloeiPerMaand} huidigeMaand={huidigeMaand} />
             </div>
 
             {/* Plant grid */}
