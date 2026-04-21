@@ -100,6 +100,7 @@ export function GardenCanvas({
   const [selectedPlacementId, setSelectedPlacementId] = useState<string | null>(null);
 
   const drag = useRef<{ id: string; ox: number; oy: number; sx: number; sy: number; moved: boolean } | null>(null);
+  const boundaryDrag = useRef<{ index: number; sx: number; sy: number } | null>(null);
 
   function svgCoords(e: React.MouseEvent): Point {
     const svg = svgRef.current!;
@@ -175,6 +176,11 @@ export function GardenCanvas({
   function handleMouseMove(e: React.MouseEvent) {
     const c = svgCoords(e);
     setMouse(c);
+    if (boundaryDrag.current) {
+      const { index } = boundaryDrag.current;
+      setBoundaryPts(prev => prev.map((p, i) => i === index ? { x: c.x, y: c.y } : p));
+      return;
+    }
     if (!drag.current) return;
     const d = drag.current;
     const dx = c.x - d.sx, dy = c.y - d.sy;
@@ -183,12 +189,23 @@ export function GardenCanvas({
   }
 
   function handleMouseUp() {
+    if (boundaryDrag.current) {
+      saveBoundary(boundaryPts, boundaryId);
+      boundaryDrag.current = null;
+      return;
+    }
     if (drag.current?.moved) {
       const d = drag.current;
       const p = placements.find(pl => pl.id === d.id);
       if (p) supabase.from("plant_placements").update({ x: p.x, y: p.y }).eq("id", d.id);
     }
     drag.current = null;
+  }
+
+  function handleBoundaryPointMouseDown(e: React.MouseEvent, index: number) {
+    e.stopPropagation();
+    const c = svgCoords(e);
+    boundaryDrag.current = { index, sx: c.x, sy: c.y };
   }
 
   function handlePlantMouseDown(e: React.MouseEvent, p: Placement) {
@@ -341,6 +358,14 @@ export function GardenCanvas({
                 const next = boundaryPts[(i + 1) % boundaryPts.length];
                 return <AfmetingLabel key={i} a={p} b={next} />;
               })}
+              {/* Draggable vertex handles */}
+              {boundaryPts.map((p, i) => (
+                <circle key={i} cx={p.x} cy={p.y} r={7}
+                  fill="white" stroke="#5a9a30" strokeWidth="2"
+                  style={{ cursor: "move" }}
+                  onMouseDown={e => handleBoundaryPointMouseDown(e, i)}
+                />
+              ))}
             </>
           )}
 
