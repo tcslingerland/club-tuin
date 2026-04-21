@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* ── Design System: Club Tuin ── */
+:root {
+  /* Base — warmer cream from Club Tuin */
+  --color-base: #F0EDE8;
+  --color-base-dark: #0f1710;
+  --color-surface: #E8E4DE;
+  --color-surface-dark: #1a2420;
+  --color-border: #C9D5C9;
+  --color-border-dark: #2a3830;
+  --color-text: #1A2820;
+  --color-text-muted: #7A9080;
+  --color-text-dark: #EAF0EA;
+  --color-text-muted-dark: #7A9080;
+
+  /* Accents — Club Tuin palette */
+  --color-accent-primary: #4A7A5C;       /* muted forest green — replaces blue */
+  --color-accent-primary-hover: #3d6b4f;
+  --color-accent-cta: #D4784A;           /* burnt orange — matches coffee app's terracotta */
+  --color-accent-cta-hover: #bb6438;
+  --color-accent-success: #4A7A5C;       /* same green for success states */
+  --color-accent-header: #4D7A42;        /* slightly brighter forest green for header */
+
+  /* Fonts */
+  --font-serif: var(--font-dm-sans);
+  --font-display: var(--font-playfair);
+}
+
+@theme inline {
+  --color-background: var(--color-base);
+  --color-foreground: var(--color-text);
+  --font-sans: var(--font-dm-sans);
+
+  --color-cta: var(--color-accent-cta);
+  --color-primary: var(--color-accent-primary);
+  --color-success: var(--color-accent-success);
+}
+
+/* ── Base ── */
+html {
+  background-color: var(--color-base);
+  color: var(--color-text);
+}
+
+html.dark {
+  background-color: var(--color-base-dark);
+  color: var(--color-text-dark);
+}
+
+body {
+  background: inherit;
+  color: inherit;
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Typography helpers ── */
+.font-display {
+  font-family: var(--font-playfair), Georgia, serif;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 2px;
+}
+
+/* ── Focus ring ── */
+:focus-visible {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
