@@ -13,7 +13,6 @@ import Link from "next/link";
 function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  console.log("SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
