@@ -244,6 +244,22 @@ export function GardenCanvas({
     .filter(p => p.naam.toLowerCase().includes(plantSearch.toLowerCase()))
     .slice(0, 60);
 
+  // Dynamic viewBox — fits all content so tuin scales on mobile
+  const viewBox = (() => {
+    const allPts = [
+      ...boundaryPts,
+      ...zones.flatMap(z => z.points),
+      ...placements.map(p => ({ x: p.x, y: p.y })),
+    ];
+    if (allPts.length === 0) return "0 0 600 420";
+    const pad = 50;
+    const minX = Math.min(...allPts.map(p => p.x)) - pad;
+    const minY = Math.min(...allPts.map(p => p.y)) - pad;
+    const maxX = Math.max(...allPts.map(p => p.x)) + pad;
+    const maxY = Math.max(...allPts.map(p => p.y)) + pad;
+    return `${minX} ${minY} ${maxX - minX} ${maxY - minY}`;
+  })();
+
   const hint =
     mode === "teken" && !closed && boundaryPts.length === 0 ? "Klik om de tuingrens te tekenen" :
     mode === "teken" && !closed && boundaryPts.length < 3 ? "Voeg meer punten toe" :
@@ -259,10 +275,10 @@ export function GardenCanvas({
 
   const btnBase = "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border";
   const btnActive = "bg-[var(--color-accent-primary)] text-white border-[var(--color-accent-primary)]";
-  const btnIdle = "bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] border-[var(--color-border)] dark:border-[var(--color-border-dark)] text-[var(--color-text)]";
+  const btnIdle = "bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] border-[#b0b8a8] dark:border-[var(--color-border-dark)] text-[var(--color-text)] dark:text-[var(--color-text-dark)]";
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 w-full overflow-x-hidden">
       {/* Toolbar */}
       <div className="flex flex-wrap gap-2 items-center">
         <button className={`${btnBase} ${mode === "teken" ? btnActive : btnIdle}`} onClick={() => setMode("teken")}>✎ Tekenen</button>
@@ -311,6 +327,7 @@ export function GardenCanvas({
         <svg
           ref={svgRef}
           width="100%" height="100%"
+          viewBox={closed ? viewBox : undefined}
           style={{ cursor: (mode === "teken" || mode === "zon" || (mode === "plant" && selectedPlant)) ? "crosshair" : "default" }}
           onClick={handleClick}
           onMouseMove={handleMouseMove}
@@ -454,22 +471,24 @@ export function GardenCanvas({
             onChange={e => setPlantSearch(e.target.value)}
             className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] outline-none focus:border-[var(--color-accent-primary)]"
           />
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {filteredPlants.map(plant => (
-              <button
-                key={plant.id}
-                onClick={() => setSelectedPlant(plant.id)}
-                title={plant.naam}
-                className={`flex-shrink-0 flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg border text-xs transition-colors ${
-                  selectedPlant === plant.id
-                    ? "border-[var(--color-accent-primary)] bg-[var(--color-accent-primary)]/10"
-                    : "border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)]"
-                }`}
-              >
-                <span className="text-lg">{plant.emoji}</span>
-                <span className="max-w-[56px] truncate text-[var(--color-text-muted)]">{plant.naam}</span>
-              </button>
-            ))}
+          <div className="w-full overflow-x-auto">
+            <div className="flex gap-2 pb-1">
+              {filteredPlants.map(plant => (
+                <button
+                  key={plant.id}
+                  onClick={() => setSelectedPlant(plant.id)}
+                  title={plant.naam}
+                  className={`flex-shrink-0 flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg border text-xs transition-colors ${
+                    selectedPlant === plant.id
+                      ? "border-[var(--color-accent-primary)] bg-[var(--color-accent-primary)]/10"
+                      : "border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)]"
+                  }`}
+                >
+                  <span className="text-lg">{plant.emoji}</span>
+                  <span className="max-w-[56px] truncate text-[var(--color-text-muted)]">{plant.naam}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
