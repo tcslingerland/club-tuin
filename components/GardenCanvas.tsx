@@ -33,7 +33,7 @@ function pts(points: Point[]) {
   return points.map(p => `${p.x},${p.y}`).join(" ");
 }
 
-const SCHAAL = 100; // 100px = 1 meter
+const SCHAAL = 100;
 
 function AfmetingLabel({ a, b, preview = false }: { a: Point; b: Point; preview?: boolean }) {
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
@@ -102,13 +102,23 @@ export function GardenCanvas({
   const drag = useRef<{ id: string; ox: number; oy: number; sx: number; sy: number; moved: boolean } | null>(null);
   const boundaryDrag = useRef<{ index: number; sx: number; sy: number } | null>(null);
 
-  function svgCoords(e: React.MouseEvent): Point {
+  // ── Coordinate helpers ──────────────────────────────────────────────────────
+
+  function clientToSvg(clientX: number, clientY: number): Point {
     const svg = svgRef.current!;
     const pt = svg.createSVGPoint();
-    pt.x = e.clientX; pt.y = e.clientY;
+    pt.x = clientX; pt.y = clientY;
     const t = pt.matrixTransform(svg.getScreenCTM()!.inverse());
     return { x: Math.round(t.x), y: Math.round(t.y) };
   }
+
+  function svgCoords(e: React.MouseEvent) { return clientToSvg(e.clientX, e.clientY); }
+  function touchCoords(e: React.TouchEvent) {
+    const t = e.touches[0] ?? e.changedTouches[0];
+    return clientToSvg(t.clientX, t.clientY);
+  }
+
+  // ── Supabase ────────────────────────────────────────────────────────────────
 
   async function saveBoundary(points: Point[], id?: string) {
     const path = JSON.stringify(points);
@@ -133,10 +143,53 @@ export function GardenCanvas({
     setBoundaryPts([]); setClosed(false); setBoundaryId(undefined); setMode("teken");
   }
 
-  function handleClick(e: React.MouseEvent) {
-    if (drag.current?.moved) return;
+  async function removePlacement(id: string) {
+    await supabase.from("plant_placements").delete().eq("id", id);
+    setPlacements(prev => prev.filter(p => p.id !== id));
     setSelectedPlacementId(null);
-    const c = svgCoords(e);
+  }
+
+  async function toggleInPot(id: string) {
+    const p = placements.find(pl => pl.id === id);
+    if (!p) return;
+    const newVal = !p.in_pot;
+    setPlacements(prev => prev.map(pl => pl.id === id ? { ...pl, in_pot: newVal } : pl));
+    await supabase.from("plant_placements").update({ in_pot: newVal }).eq("id", id);
+  }
+
+  // ── Shared move/up logic ────────────────────────────────────────────────────
+
+  function applyMove(c: Point) {
+    if (boundaryDrag.current) {
+      const { index } = boundaryDrag.current;
+      setBoundaryPts(prev => prev.map((p, i) => i === index ? { x: c.x, y: c.y } : p));
+      return;
+    }
+    if (!drag.current) return;
+    const d = drag.current;
+    const dx = c.x - d.sx, dy = c.y - d.sy;
+    if (Math.hypot(dx, dy) > 3) d.moved = true;
+    if (d.moved) setPlacements(prev => prev.map(p => p.id === d.id ? { ...p, x: d.ox + dx, y: d.oy + dy } : p));
+  }
+
+  function applyUp() {
+    if (boundaryDrag.current) {
+      saveBoundary(boundaryPts, boundaryId);
+      boundaryDrag.current = null;
+      return;
+    }
+    if (drag.current?.moved) {
+      const d = drag.current;
+      const p = placements.find(pl => pl.id === d.id);
+      if (p) supabase.from("plant_placements").update({ x: p.x, y: p.y }).eq("id", d.id);
+    }
+    drag.current = null;
+  }
+
+  // ── Canvas click logic ──────────────────────────────────────────────────────
+
+  function handleCanvasClick(c: Point) {
+    setSelectedPlacementId(null);
 
     if (mode === "teken" && !closed) {
       if (boundaryPts.length >= 3 && Math.hypot(c.x - boundaryPts[0].x, c.y - boundaryPts[0].y) < 15) {
@@ -154,9 +207,7 @@ export function GardenCanvas({
         supabase.from("garden_shapes")
           .insert({ garden_id: gardenId, type: "zone", zone_type: zoneType, svg_path: path })
           .select().single()
-          .then(({ data }) => {
-            setZones(prev => [...prev, { ...z, id: data?.id }]);
-          });
+          .then(({ data }) => { setZones(prev => [...prev, { ...z, id: data?.id }]); });
         setZonePts([]);
         return;
       }
@@ -173,40 +224,20 @@ export function GardenCanvas({
     }
   }
 
+  // ── Mouse handlers ──────────────────────────────────────────────────────────
+
+  function handleClick(e: React.MouseEvent) {
+    if (drag.current?.moved) return;
+    handleCanvasClick(svgCoords(e));
+  }
+
   function handleMouseMove(e: React.MouseEvent) {
     const c = svgCoords(e);
     setMouse(c);
-    if (boundaryDrag.current) {
-      const { index } = boundaryDrag.current;
-      setBoundaryPts(prev => prev.map((p, i) => i === index ? { x: c.x, y: c.y } : p));
-      return;
-    }
-    if (!drag.current) return;
-    const d = drag.current;
-    const dx = c.x - d.sx, dy = c.y - d.sy;
-    if (Math.hypot(dx, dy) > 3) d.moved = true;
-    if (d.moved) setPlacements(prev => prev.map(p => p.id === d.id ? { ...p, x: d.ox + dx, y: d.oy + dy } : p));
+    applyMove(c);
   }
 
-  function handleMouseUp() {
-    if (boundaryDrag.current) {
-      saveBoundary(boundaryPts, boundaryId);
-      boundaryDrag.current = null;
-      return;
-    }
-    if (drag.current?.moved) {
-      const d = drag.current;
-      const p = placements.find(pl => pl.id === d.id);
-      if (p) supabase.from("plant_placements").update({ x: p.x, y: p.y }).eq("id", d.id);
-    }
-    drag.current = null;
-  }
-
-  function handleBoundaryPointMouseDown(e: React.MouseEvent, index: number) {
-    e.stopPropagation();
-    const c = svgCoords(e);
-    boundaryDrag.current = { index, sx: c.x, sy: c.y };
-  }
+  function handleMouseUp() { applyUp(); }
 
   function handlePlantMouseDown(e: React.MouseEvent, p: Placement) {
     e.stopPropagation();
@@ -220,19 +251,49 @@ export function GardenCanvas({
     setSelectedPlacementId(prev => prev === p.id ? null : p.id);
   }
 
-  async function removePlacement(id: string) {
-    await supabase.from("plant_placements").delete().eq("id", id);
-    setPlacements(prev => prev.filter(p => p.id !== id));
-    setSelectedPlacementId(null);
+  function handleBoundaryPointMouseDown(e: React.MouseEvent, index: number) {
+    e.stopPropagation();
+    const c = svgCoords(e);
+    boundaryDrag.current = { index, sx: c.x, sy: c.y };
   }
 
-  async function toggleInPot(id: string) {
-    const p = placements.find(pl => pl.id === id);
-    if (!p) return;
-    const newVal = !p.in_pot;
-    setPlacements(prev => prev.map(pl => pl.id === id ? { ...pl, in_pot: newVal } : pl));
-    await supabase.from("plant_placements").update({ in_pot: newVal }).eq("id", id);
+  // ── Touch handlers ──────────────────────────────────────────────────────────
+
+  function handleSvgTouchMove(e: React.TouchEvent) {
+    if (drag.current || boundaryDrag.current) e.preventDefault();
+    applyMove(touchCoords(e));
   }
+
+  function handleSvgTouchEnd(e: React.TouchEvent) {
+    const wasDragging = drag.current?.moved || !!boundaryDrag.current;
+    applyUp();
+    if (!wasDragging) handleCanvasClick(clientToSvg(e.changedTouches[0].clientX, e.changedTouches[0].clientY));
+  }
+
+  function handlePlantTouchStart(e: React.TouchEvent, p: Placement) {
+    e.stopPropagation();
+    const c = touchCoords(e);
+    drag.current = { id: p.id, ox: p.x, oy: p.y, sx: c.x, sy: c.y, moved: false };
+  }
+
+  function handlePlantTouchEnd(e: React.TouchEvent, p: Placement) {
+    e.stopPropagation();
+    if (!drag.current?.moved) {
+      applyUp();
+      setSelectedPlacementId(prev => prev === p.id ? null : p.id);
+    } else {
+      applyUp();
+    }
+  }
+
+  function handleBoundaryTouchStart(e: React.TouchEvent, index: number) {
+    e.stopPropagation();
+    e.preventDefault();
+    const c = touchCoords(e);
+    boundaryDrag.current = { index, sx: c.x, sy: c.y };
+  }
+
+  // ── Misc ────────────────────────────────────────────────────────────────────
 
   function undo() {
     if (mode === "teken" && !closed) setBoundaryPts(prev => prev.slice(0, -1));
@@ -244,7 +305,6 @@ export function GardenCanvas({
     .filter(p => p.naam.toLowerCase().includes(plantSearch.toLowerCase()))
     .slice(0, 60);
 
-  // Dynamic viewBox — fits all content so tuin scales on mobile
   const viewBox = (() => {
     const allPts = [
       ...boundaryPts,
@@ -261,25 +321,25 @@ export function GardenCanvas({
   })();
 
   const hint =
-    mode === "teken" && !closed && boundaryPts.length === 0 ? "Klik om de tuingrens te tekenen" :
+    mode === "teken" && !closed && boundaryPts.length === 0 ? "Tik om de tuingrens te tekenen" :
     mode === "teken" && !closed && boundaryPts.length < 3 ? "Voeg meer punten toe" :
-    mode === "teken" && !closed ? "Klik op het startpunt ● om te sluiten" :
+    mode === "teken" && !closed ? "Tik op het startpunt ● om te sluiten" :
     mode === "teken" && closed ? "Grens gesloten — kies een andere modus" :
-    mode === "zon" && zonePts.length === 0 ? "Klik om een zonzone te tekenen" :
+    mode === "zon" && zonePts.length === 0 ? "Tik om een zonzone te tekenen" :
     mode === "zon" && zonePts.length < 3 ? "Voeg meer punten toe" :
-    mode === "zon" ? "Klik op het startpunt ● om te sluiten" :
+    mode === "zon" ? "Tik op het startpunt ● om te sluiten" :
     mode === "plant" && !selectedPlant ? "Selecteer een plant hieronder" :
     mode === "plant" && !closed ? "Teken eerst de tuingrens" :
-    mode === "plant" ? "Klik in de tuin om te plaatsen · klik op plant voor opties" :
-    "Klik op een plant voor pot-toggle of verwijderen";
+    mode === "plant" ? "Tik in de tuin om te plaatsen · tik op plant voor opties" :
+    "Tik op een plant voor pot-toggle of verwijderen";
 
   const btnBase = "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border";
   const btnActive = "bg-[var(--color-accent-primary)] text-white border-[var(--color-accent-primary)]";
   const btnIdle = "bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] border-[#b0b8a8] dark:border-[var(--color-border-dark)] text-[var(--color-text)] dark:text-[var(--color-text-dark)]";
 
   return (
-    <div className="space-y-2 w-full overflow-x-hidden">
-      {/* Toolbar */}
+    <div className="space-y-2 min-w-0 w-full">
+      {/* Toolbar — twee rijen op mobiel */}
       <div className="flex flex-wrap gap-2 items-center">
         <button className={`${btnBase} ${mode === "teken" ? btnActive : btnIdle}`} onClick={() => setMode("teken")}>✎ Tekenen</button>
         {(["zon", "halfschaduw", "schaduw"] as ZoneType[]).map(zt => (
@@ -293,7 +353,6 @@ export function GardenCanvas({
           </button>
         ))}
         <button className={`${btnBase} ${mode === "plant" ? btnActive : btnIdle}`} onClick={() => setMode("plant")}>✿ Plant</button>
-        <div className="flex-1" />
         <button className={`${btnBase} ${showGrid ? "bg-[var(--color-accent-primary)]/15 border-[var(--color-accent-primary)]/40" : btnIdle}`} onClick={() => setShowGrid(g => !g)}>⊞</button>
         {(mode === "teken" || mode === "zon") && (
           <button className={`${btnBase} ${btnIdle}`} onClick={undo}>↩</button>
@@ -328,11 +387,13 @@ export function GardenCanvas({
           ref={svgRef}
           width="100%" height="100%"
           viewBox={closed ? viewBox : undefined}
-          style={{ cursor: (mode === "teken" || mode === "zon" || (mode === "plant" && selectedPlant)) ? "crosshair" : "default" }}
+          style={{ cursor: (mode === "teken" || mode === "zon" || (mode === "plant" && selectedPlant)) ? "crosshair" : "default", touchAction: "none" }}
           onClick={handleClick}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onTouchMove={handleSvgTouchMove}
+          onTouchEnd={handleSvgTouchEnd}
         >
           <defs>
             <filter id="pshadow"><feDropShadow dx="1" dy="1" stdDeviation="2" floodOpacity="0.2" /></filter>
@@ -381,6 +442,7 @@ export function GardenCanvas({
                   fill="white" stroke="#5a9a30" strokeWidth="2"
                   style={{ cursor: "move" }}
                   onMouseDown={e => handleBoundaryPointMouseDown(e, i)}
+                  onTouchStart={e => handleBoundaryTouchStart(e, i)}
                 />
               ))}
             </>
@@ -415,6 +477,8 @@ export function GardenCanvas({
               <g key={p.id} transform={`translate(${p.x},${p.y})`} style={{ cursor: "grab" }}
                 onMouseDown={e => handlePlantMouseDown(e, p)}
                 onClick={e => handlePlantClick(e, p)}
+                onTouchStart={e => handlePlantTouchStart(e, p)}
+                onTouchEnd={e => handlePlantTouchEnd(e, p)}
               >
                 <circle r={17} fill={p.in_pot ? "#FDF0EA" : "white"}
                   stroke={selected ? "#2563eb" : p.in_pot ? "#D4784A" : "#5a9a30"}
@@ -434,7 +498,6 @@ export function GardenCanvas({
                       style={{ userSelect: "none", pointerEvents: "none" }}>
                       {plant.naam}
                     </text>
-                    {/* Pot toggle */}
                     <g onClick={e => { e.stopPropagation(); toggleInPot(p.id); }} style={{ cursor: "pointer" }}>
                       <rect x={6} y={22} width={46} height={22} rx={5}
                         fill={p.in_pot ? "#FDF0EA" : "#f0fdf4"} stroke={p.in_pot ? "#D4784A" : "#5a9a30"} strokeWidth="1" />
@@ -443,7 +506,6 @@ export function GardenCanvas({
                         {p.in_pot ? "🪴 Pot" : "🌍 Grond"}
                       </text>
                     </g>
-                    {/* Delete */}
                     <g onClick={e => { e.stopPropagation(); removePlacement(p.id); }} style={{ cursor: "pointer" }}>
                       <rect x={58} y={22} width={46} height={22} rx={5}
                         fill="#fff5f5" stroke="#fca5a5" strokeWidth="1" />
@@ -465,14 +527,14 @@ export function GardenCanvas({
 
       {/* Plant picker */}
       {mode === "plant" && (
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           <input
             type="text" placeholder="Zoek plant…" value={plantSearch}
             onChange={e => setPlantSearch(e.target.value)}
             className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] outline-none focus:border-[var(--color-accent-primary)]"
           />
-          <div className="w-full overflow-x-auto">
-            <div className="flex gap-2 pb-1">
+          <div className="overflow-x-auto">
+            <div className="flex gap-2 pb-1" style={{ width: "max-content" }}>
               {filteredPlants.map(plant => (
                 <button
                   key={plant.id}
