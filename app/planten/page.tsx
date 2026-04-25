@@ -25,9 +25,17 @@ const CATEGORIE_LABELS: Record<string, string> = {
   bodembedekker: "Bodembedekkers",
 };
 
+const MAANDEN_KORT = ["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
+
+function plantBloeitInMaand(plant: Plant, maand: number): boolean {
+  return plant.v[maand as keyof typeof plant.v]?.some(t => t.toLowerCase().includes("bloei")) ?? false;
+}
+
 export default function PlantenPage() {
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<PlantCategory | "alle">("alle");
+  const [activeZon, setActiveZon] = useState<"alle" | "zon" | "halfschaduw" | "schaduw" | "beide">("alle");
+  const [activeBloeiMaand, setActiveBloeiMaand] = useState<number>(0);
 
   const categories = getPlantCategories();
 
@@ -38,7 +46,11 @@ export default function PlantenPage() {
       p.latijn.toLowerCase().includes(query.toLowerCase());
     const matchesCategory =
       activeCategory === "alle" || p.cat === activeCategory;
-    return matchesQuery && matchesCategory;
+    const matchesZon =
+      activeZon === "alle" || p.zon === activeZon;
+    const matchesBloei =
+      activeBloeiMaand === 0 || plantBloeitInMaand(p, activeBloeiMaand);
+    return matchesQuery && matchesCategory && matchesZon && matchesBloei;
   });
 
   return (
@@ -86,6 +98,55 @@ export default function PlantenPage() {
         })}
       </div>
 
+      {/* Sun filter */}
+      <div className="flex flex-wrap gap-2">
+        {(["alle", "zon", "halfschaduw", "schaduw", "beide"] as const).map((zon) => (
+          <button
+            key={zon}
+            onClick={() => setActiveZon(zon)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              activeZon === zon
+                ? "bg-[var(--color-accent-primary)] text-white border-[var(--color-accent-primary)]"
+                : "border-[var(--color-border)] dark:border-[var(--color-border-dark)] text-[var(--color-text-muted)] hover:border-[var(--color-accent-primary)]"
+            }`}
+          >
+            {zon === "alle" ? "Alle zon" : zon === "zon" ? "☀️ Zon" : zon === "halfschaduw" ? "⛅ Half" : zon === "schaduw" ? "🌑 Schaduw" : "☀️⛅ Beide"}
+          </button>
+        ))}
+      </div>
+
+      {/* Bloom month filter */}
+      <div className="overflow-x-auto">
+        <div className="flex gap-1.5 pb-1 w-max">
+          <button
+            onClick={() => setActiveBloeiMaand(0)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+              activeBloeiMaand === 0
+                ? "bg-[var(--color-accent-primary)] text-white border-[var(--color-accent-primary)]"
+                : "border-[var(--color-border)] dark:border-[var(--color-border-dark)] text-[var(--color-text-muted)] hover:border-[var(--color-accent-primary)]"
+            }`}
+          >
+            Alle maanden
+          </button>
+          {MAANDEN_KORT.map((maand, i) => {
+            const nr = i + 1;
+            return (
+              <button
+                key={nr}
+                onClick={() => setActiveBloeiMaand(nr)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                  activeBloeiMaand === nr
+                    ? "bg-[var(--color-accent-primary)] text-white border-[var(--color-accent-primary)]"
+                    : "border-[var(--color-border)] dark:border-[var(--color-border-dark)] text-[var(--color-text-muted)] hover:border-[var(--color-accent-primary)]"
+                }`}
+              >
+                {maand.charAt(0).toUpperCase() + maand.slice(1)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Results count */}
       <p className="text-xs text-[var(--color-text-muted)]">
         {filtered.length} {filtered.length === 1 ? "plant" : "planten"}
@@ -102,7 +163,7 @@ export default function PlantenPage() {
         <div className="text-center py-12">
           <span className="text-4xl block mb-3">🔍</span>
           <p className="text-[var(--color-text-muted)] text-sm">
-            Geen planten gevonden voor &ldquo;{query}&rdquo;
+            Geen planten gevonden{query ? ` voor "${query}"` : ""}
           </p>
         </div>
       )}

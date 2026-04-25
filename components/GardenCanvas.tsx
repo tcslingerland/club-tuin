@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { plantenDb } from "@/lib/plants";
 
@@ -93,7 +93,7 @@ export function GardenCanvas({
   const [zoneType, setZoneType] = useState<ZoneType>("zon");
   const [zonePts, setZonePts] = useState<Point[]>([]);
   const [mouse, setMouse] = useState<Point | null>(null);
-  const [showGrid, setShowGrid] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
 
   const [selectedPlant, setSelectedPlant] = useState<number | null>(null);
   const [plantSearch, setPlantSearch] = useState("");
@@ -252,6 +252,7 @@ export function GardenCanvas({
   }
 
   function handleBoundaryPointMouseDown(e: React.MouseEvent, index: number) {
+    if (mode !== "teken") return;
     e.stopPropagation();
     const c = svgCoords(e);
     boundaryDrag.current = { index, sx: c.x, sy: c.y };
@@ -287,6 +288,7 @@ export function GardenCanvas({
   }
 
   function handleBoundaryTouchStart(e: React.TouchEvent, index: number) {
+    if (mode !== "teken") return;
     e.stopPropagation();
     e.preventDefault();
     const c = touchCoords(e);
@@ -301,23 +303,34 @@ export function GardenCanvas({
   }
 
   const currentMonth = new Date().getMonth() + 1;
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedPlacementId) {
+        removePlacement(selectedPlacementId);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedPlacementId]);
   const filteredPlants = plantenDb
     .filter(p => p.naam.toLowerCase().includes(plantSearch.toLowerCase()))
     .slice(0, 60);
 
-  const viewBox = (() => {
+  const { viewBox, vbMinX, vbMinY, vbW, vbH } = (() => {
     const allPts = [
       ...boundaryPts,
       ...zones.flatMap(z => z.points),
       ...placements.map(p => ({ x: p.x, y: p.y })),
     ];
-    if (allPts.length === 0) return "0 0 600 420";
+    if (allPts.length === 0) return { viewBox: "0 0 600 420", vbMinX: 0, vbMinY: 0, vbW: 600, vbH: 420 };
     const pad = 50;
     const minX = Math.min(...allPts.map(p => p.x)) - pad;
     const minY = Math.min(...allPts.map(p => p.y)) - pad;
     const maxX = Math.max(...allPts.map(p => p.x)) + pad;
     const maxY = Math.max(...allPts.map(p => p.y)) + pad;
-    return `${minX} ${minY} ${maxX - minX} ${maxY - minY}`;
+    const w = maxX - minX, h = maxY - minY;
+    return { viewBox: `${minX} ${minY} ${w} ${h}`, vbMinX: minX, vbMinY: minY, vbW: w, vbH: h };
   })();
 
   const hint =
@@ -378,10 +391,42 @@ export function GardenCanvas({
         </div>
       )}
 
-      {/* SVG Canvas */}
-      <div
-        className="w-full rounded-xl overflow-hidden border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[#eef5e8] dark:bg-[#1a2a15]"
-        style={{ height: 420 }}
+      {/* Canvas + plant picker */}
+      <div className="flex flex-col-reverse md:flex-row gap-3 items-start">
+        {/* Plant picker — links op desktop, onderaan op mobiel */}
+        {mode === "plant" && (
+          <div className="w-full md:w-48 shrink-0 space-y-2">
+            <input
+              type="text" placeholder="Zoek plant…" value={plantSearch}
+              onChange={e => setPlantSearch(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] outline-none focus:border-[var(--color-accent-primary)]"
+            />
+            <div className="overflow-x-auto md:overflow-x-visible md:overflow-y-auto md:max-h-[384px]">
+              <div className="flex flex-row md:flex-col gap-2 pb-1 md:pb-0 w-max md:w-full">
+                {filteredPlants.map(plant => (
+                  <button
+                    key={plant.id}
+                    onClick={() => setSelectedPlant(plant.id)}
+                    title={plant.naam}
+                    className={`flex-shrink-0 md:flex-shrink flex flex-col md:flex-row items-center gap-1 md:gap-2 px-2 py-1.5 rounded-lg border text-xs transition-colors md:w-full ${
+                      selectedPlant === plant.id
+                        ? "border-[var(--color-accent-primary)] bg-[var(--color-accent-primary)]/10"
+                        : "border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)]"
+                    }`}
+                  >
+                    <span className="text-lg">{plant.emoji}</span>
+                    <span className="max-w-[56px] md:max-w-none truncate text-[var(--color-text-muted)]">{plant.naam}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SVG Canvas */}
+        <div
+          className="flex-1 min-w-0 rounded-xl overflow-hidden border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[#eef5e8] dark:bg-[#1a2a15]"
+          style={{ height: 420 }}
       >
         <svg
           ref={svgRef}
@@ -440,7 +485,7 @@ export function GardenCanvas({
               {boundaryPts.map((p, i) => (
                 <circle key={i} cx={p.x} cy={p.y} r={7}
                   fill="white" stroke="#5a9a30" strokeWidth="2"
-                  style={{ cursor: "move" }}
+                  style={{ cursor: mode === "teken" ? "move" : "default" }}
                   onMouseDown={e => handleBoundaryPointMouseDown(e, i)}
                   onTouchStart={e => handleBoundaryTouchStart(e, i)}
                 />
@@ -473,6 +518,8 @@ export function GardenCanvas({
             if (!plant) return null;
             const hasTask = (plant.v[currentMonth as keyof typeof plant.v]?.length ?? 0) > 0;
             const selected = selectedPlacementId === p.id;
+            const popupOffsetX = (p.x - vbMinX > vbW - 140) ? -120 : 20;
+            const popupOffsetY = (p.y - vbMinY < 60) ? 15 : -55;
             return (
               <g key={p.id} transform={`translate(${p.x},${p.y})`} style={{ cursor: "grab" }}
                 onMouseDown={e => handlePlantMouseDown(e, p)}
@@ -490,7 +537,7 @@ export function GardenCanvas({
 
                 {/* Popover */}
                 {selected && (
-                  <g transform="translate(20,-40)" style={{ pointerEvents: "auto" }}>
+                  <g transform={`translate(${popupOffsetX},${popupOffsetY})`} style={{ pointerEvents: "auto" }}>
                     <rect x={0} y={0} width={110} height={52} rx={8}
                       fill="white" stroke="#e5e7eb" strokeWidth="1"
                       filter="url(#pshadow)" />
@@ -520,40 +567,11 @@ export function GardenCanvas({
             );
           })}
         </svg>
+        </div>
       </div>
 
       {/* Hint */}
       <p className="text-xs text-center text-[var(--color-text-muted)]">{hint}</p>
-
-      {/* Plant picker */}
-      {mode === "plant" && (
-        <div className="space-y-2 min-w-0">
-          <input
-            type="text" placeholder="Zoek plant…" value={plantSearch}
-            onChange={e => setPlantSearch(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] outline-none focus:border-[var(--color-accent-primary)]"
-          />
-          <div className="overflow-x-auto">
-            <div className="flex gap-2 pb-1" style={{ width: "max-content" }}>
-              {filteredPlants.map(plant => (
-                <button
-                  key={plant.id}
-                  onClick={() => setSelectedPlant(plant.id)}
-                  title={plant.naam}
-                  className={`flex-shrink-0 flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg border text-xs transition-colors ${
-                    selectedPlant === plant.id
-                      ? "border-[var(--color-accent-primary)] bg-[var(--color-accent-primary)]/10"
-                      : "border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)]"
-                  }`}
-                >
-                  <span className="text-lg">{plant.emoji}</span>
-                  <span className="max-w-[56px] truncate text-[var(--color-text-muted)]">{plant.naam}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

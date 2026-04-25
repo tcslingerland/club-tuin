@@ -56,6 +56,9 @@ export default function PlantDetailPage({
         </div>
       </div>
 
+      {/* Add to garden */}
+      <AddToGardenSection plantId={plant.id} />
+
       {/* Properties */}
       <div className="grid grid-cols-3 gap-3">
         <Card>
@@ -137,9 +140,6 @@ export default function PlantDetailPage({
           })}
         </CardContent>
       </Card>
-
-      {/* Add to garden */}
-      <AddToGardenSection plantId={plant.id} />
     </div>
   );
 }

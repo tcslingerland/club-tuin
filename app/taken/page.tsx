@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { TakenKalender } from "@/components/TakenKalender";
 import Link from "next/link";
+import { MarkTakenBezocht } from "./MarkTakenBezocht";
 
 export default async function TakenPage() {
   const supabase = await createClient();
@@ -64,6 +65,7 @@ export default async function TakenPage() {
         </p>
       </div>
 
+      <MarkTakenBezocht />
       <TakenKalender
         placements={placements}
         initialCareLogs={(careLogs ?? []) as { id: string; placement_id: string; task: string; done_at: string }[]}
