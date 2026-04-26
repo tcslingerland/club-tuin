@@ -98,8 +98,11 @@ export function GardenCanvas({
   const [selectedPlant, setSelectedPlant] = useState<number | null>(null);
   const [plantSearch, setPlantSearch] = useState("");
   const [selectedPlacementId, setSelectedPlacementId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const drag = useRef<{ id: string; ox: number; oy: number; sx: number; sy: number; moved: boolean } | null>(null);
+  const drag = useRef<{ id: string; ox: number; oy: number; sx: number; sy: number; lx: number; ly: number; moved: boolean } | null>(null);
   const boundaryDrag = useRef<{ index: number; sx: number; sy: number } | null>(null);
 
   // ── Coordinate helpers ──────────────────────────────────────────────────────
@@ -157,6 +160,26 @@ export function GardenCanvas({
     await supabase.from("plant_placements").update({ in_pot: newVal }).eq("id", id);
   }
 
+  async function saveAll() {
+    setSaving(true);
+    await Promise.all([
+      ...placements.map(p =>
+        supabase.from("plant_placements").update({ x: p.x, y: p.y, in_pot: p.in_pot }).eq("id", p.id)
+      ),
+      ...(boundaryId && boundaryPts.length > 0
+        ? [supabase.from("garden_shapes").update({ svg_path: JSON.stringify(boundaryPts) }).eq("id", boundaryId)]
+        : []),
+      ...zones.filter(z => z.id).map(z =>
+        supabase.from("garden_shapes").update({ svg_path: JSON.stringify(z.points) }).eq("id", z.id!)
+      ),
+    ]);
+    setSaving(false);
+    setJustSaved(true);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setJustSaved(false), 2500);
+  }
+  }
+
   // ── Shared move/up logic ────────────────────────────────────────────────────
 
   function applyMove(c: Point) {
@@ -169,7 +192,10 @@ export function GardenCanvas({
     const d = drag.current;
     const dx = c.x - d.sx, dy = c.y - d.sy;
     if (Math.hypot(dx, dy) > 3) d.moved = true;
-    if (d.moved) setPlacements(prev => prev.map(p => p.id === d.id ? { ...p, x: d.ox + dx, y: d.oy + dy } : p));
+    if (d.moved) {
+      d.lx = c.x; d.ly = c.y;
+      setPlacements(prev => prev.map(p => p.id === d.id ? { ...p, x: d.ox + dx, y: d.oy + dy } : p));
+    }
   }
 
   function applyUp() {
@@ -180,8 +206,9 @@ export function GardenCanvas({
     }
     if (drag.current?.moved) {
       const d = drag.current;
-      const p = placements.find(pl => pl.id === d.id);
-      if (p) supabase.from("plant_placements").update({ x: p.x, y: p.y }).eq("id", d.id);
+      const finalX = d.ox + (d.lx - d.sx);
+      const finalY = d.oy + (d.ly - d.sy);
+      supabase.from("plant_placements").update({ x: finalX, y: finalY }).eq("id", d.id);
     }
     drag.current = null;
   }
@@ -242,7 +269,7 @@ export function GardenCanvas({
   function handlePlantMouseDown(e: React.MouseEvent, p: Placement) {
     e.stopPropagation();
     const c = svgCoords(e);
-    drag.current = { id: p.id, ox: p.x, oy: p.y, sx: c.x, sy: c.y, moved: false };
+    drag.current = { id: p.id, ox: p.x, oy: p.y, sx: c.x, sy: c.y, lx: c.x, ly: c.y, moved: false };
   }
 
   function handlePlantClick(e: React.MouseEvent, p: Placement) {
@@ -274,7 +301,7 @@ export function GardenCanvas({
   function handlePlantTouchStart(e: React.TouchEvent, p: Placement) {
     e.stopPropagation();
     const c = touchCoords(e);
-    drag.current = { id: p.id, ox: p.x, oy: p.y, sx: c.x, sy: c.y, moved: false };
+    drag.current = { id: p.id, ox: p.x, oy: p.y, sx: c.x, sy: c.y, lx: c.x, ly: c.y, moved: false };
   }
 
   function handlePlantTouchEnd(e: React.TouchEvent, p: Placement) {
@@ -373,6 +400,13 @@ export function GardenCanvas({
         {(mode === "teken" || mode === "zon") && closed && (
           <button className={`${btnBase} text-red-500 border-red-200 dark:border-red-900`} onClick={clearBoundary}>✕ Grens</button>
         )}
+        <button
+          className={`${btnBase} ml-auto ${justSaved ? "bg-green-50 border-green-400 text-green-700 dark:bg-green-900/20 dark:border-green-600 dark:text-green-400" : btnIdle}`}
+          onClick={saveAll}
+          disabled={saving}
+        >
+          {saving ? "…" : justSaved ? "✓ Opgeslagen" : "↑ Opslaan"}
+        </button>
       </div>
 
       {/* Zone delete buttons */}
