@@ -150,7 +150,7 @@ export function NatuurDashboard({
 
   const btnBase = "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border";
   const btnActive = "bg-[var(--color-accent-primary)] text-white border-[var(--color-accent-primary)]";
-  const btnIdle = "bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] border-[var(--color-border)] dark:border-[var(--color-border-dark)] text-[var(--color-text)]";
+  const btnIdle = "bg-transparent border-[var(--color-text-muted)]/40 dark:border-[var(--color-text-muted)]/40 text-[var(--color-text-muted)] dark:text-[var(--color-text-muted)] hover:border-[var(--color-accent-primary)] hover:text-[var(--color-text)] dark:hover:text-[var(--color-text-dark)]";
 
   return (
     <div className="space-y-6">
