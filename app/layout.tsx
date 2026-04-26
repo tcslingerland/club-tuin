@@ -48,7 +48,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-[var(--color-base)] dark:bg-[var(--color-base-dark)] text-[var(--color-text)] dark:text-[var(--color-text-dark)]">
         <div className="flex flex-1 min-h-screen">
           {user && <SideNav />}
-          <main className="flex-1 pb-20 md:pb-0">{children}</main>
+          <main className="flex-1 min-w-0 pb-20 md:pb-0">{children}</main>
         </div>
         {user && <BottomNav />}
       </body>

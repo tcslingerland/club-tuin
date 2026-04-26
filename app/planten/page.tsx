@@ -116,7 +116,7 @@ export default function PlantenPage() {
       </div>
 
       {/* Bloom month filter */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto w-full">
         <div className="flex gap-1.5 pb-1 w-max">
           <button
             onClick={() => setActiveBloeiMaand(0)}
