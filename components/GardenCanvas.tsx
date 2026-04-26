@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { plantenDb } from "@/lib/plants";
 
 type Point = { x: number; y: number };
-type Mode = "teken" | "zon" | "plant" | "select";
+type Mode = "teken" | "zon" | "plant" | "select" | "view";
+type ActiveTab = "tekenen" | "plant" | "view";
 type ZoneType = "zon" | "halfschaduw" | "schaduw";
 
 interface Shape {
@@ -80,6 +82,7 @@ export function GardenCanvas({
   initialPlacements: Placement[];
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const router = useRouter();
   const supabase = createClient();
 
   const initBoundary = initialShapes.find(s => s.type === "boundary");
@@ -89,7 +92,8 @@ export function GardenCanvas({
   const [zones, setZones] = useState<Shape[]>(initialShapes.filter(s => s.type === "zone"));
   const [placements, setPlacements] = useState<Placement[]>(initialPlacements);
 
-  const [mode, setMode] = useState<Mode>(initBoundary ? "select" : "teken");
+  const [mode, setMode] = useState<Mode>(initBoundary ? "view" : "teken");
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initBoundary ? "view" : "tekenen");
   const [zoneType, setZoneType] = useState<ZoneType>("zon");
   const [zonePts, setZonePts] = useState<Point[]>([]);
   const [mouse, setMouse] = useState<Point | null>(null);
@@ -178,6 +182,13 @@ export function GardenCanvas({
     if (savedTimer.current) clearTimeout(savedTimer.current);
     savedTimer.current = setTimeout(() => setJustSaved(false), 2500);
   }
+
+  function switchTab(tab: ActiveTab) {
+    setActiveTab(tab);
+    setSelectedPlacementId(null);
+    if (tab === "tekenen") setMode("teken");
+    else if (tab === "plant") setMode("plant");
+    else setMode("view");
   }
 
   // ── Shared move/up logic ────────────────────────────────────────────────────
@@ -220,7 +231,7 @@ export function GardenCanvas({
 
     if (mode === "teken" && !closed) {
       if (boundaryPts.length >= 3 && Math.hypot(c.x - boundaryPts[0].x, c.y - boundaryPts[0].y) < 15) {
-        setClosed(true); setMode("select");
+        setClosed(true); setMode("teken");
         saveBoundary(boundaryPts, boundaryId);
         return;
       }
@@ -267,6 +278,7 @@ export function GardenCanvas({
   function handleMouseUp() { applyUp(); }
 
   function handlePlantMouseDown(e: React.MouseEvent, p: Placement) {
+    if (mode === "view") return;
     e.stopPropagation();
     const c = svgCoords(e);
     drag.current = { id: p.id, ox: p.x, oy: p.y, sx: c.x, sy: c.y, lx: c.x, ly: c.y, moved: false };
@@ -299,6 +311,7 @@ export function GardenCanvas({
   }
 
   function handlePlantTouchStart(e: React.TouchEvent, p: Placement) {
+    if (mode === "view") return;
     e.stopPropagation();
     const c = touchCoords(e);
     drag.current = { id: p.id, ox: p.x, oy: p.y, sx: c.x, sy: c.y, lx: c.x, ly: c.y, moved: false };
@@ -361,6 +374,7 @@ export function GardenCanvas({
   })();
 
   const hint =
+    mode === "view" ? "Tik op een plant voor meer informatie" :
     mode === "teken" && !closed && boundaryPts.length === 0 ? "Tik om de tuingrens te tekenen" :
     mode === "teken" && !closed && boundaryPts.length < 3 ? "Voeg meer punten toe" :
     mode === "teken" && !closed ? "Tik op het startpunt ● om te sluiten" :
@@ -379,27 +393,11 @@ export function GardenCanvas({
 
   return (
     <div className="space-y-2 min-w-0 w-full">
-      {/* Toolbar — twee rijen op mobiel */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <button className={`${btnBase} ${mode === "teken" ? btnActive : btnIdle}`} onClick={() => setMode("teken")}>✎ Tekenen</button>
-        {(mode === "teken" || mode === "zon") && (["zon", "halfschaduw", "schaduw"] as ZoneType[]).map(zt => (
-          <button
-            key={zt}
-            onClick={() => { setMode("zon"); setZoneType(zt); }}
-            className={`${btnBase} ${mode === "zon" && zoneType === zt ? "ring-2 ring-[var(--color-accent-primary)]" : ""}`}
-            style={{ backgroundColor: ZONE_COLORS[zt].fill + "44", borderColor: ZONE_COLORS[zt].stroke }}
-          >
-            {zt === "zon" ? "☀ Zon" : zt === "halfschaduw" ? "⛅ Half" : "☁ Schaduw"}
-          </button>
-        ))}
-        <button className={`${btnBase} ${mode === "plant" ? btnActive : btnIdle}`} onClick={() => setMode("plant")}>✿ Plant</button>
-        <button className={`${btnBase} ${showGrid ? "bg-[var(--color-accent-primary)]/15 border-[var(--color-accent-primary)]/40" : btnIdle}`} onClick={() => setShowGrid(g => !g)}>⊞</button>
-        {(mode === "teken" || mode === "zon") && (
-          <button className={`${btnBase} ${btnIdle}`} onClick={undo}>↩</button>
-        )}
-        {(mode === "teken" || mode === "zon") && closed && (
-          <button className={`${btnBase} text-red-500 border-red-200 dark:border-red-900`} onClick={clearBoundary}>✕ Grens</button>
-        )}
+      {/* Tab bar */}
+      <div className="flex gap-1.5 items-center">
+        <button className={`${btnBase} ${activeTab === "tekenen" ? btnActive : btnIdle}`} onClick={() => switchTab("tekenen")}>✎ Tekenen</button>
+        <button className={`${btnBase} ${activeTab === "plant" ? btnActive : btnIdle}`} onClick={() => switchTab("plant")}>✿ Plant</button>
+        <button className={`${btnBase} ${activeTab === "view" ? btnActive : btnIdle}`} onClick={() => switchTab("view")}>◎ Bekijken</button>
         <button
           className={`${btnBase} ml-auto ${justSaved ? "bg-green-50 border-green-400 text-green-700 dark:bg-green-900/20 dark:border-green-600 dark:text-green-400" : btnIdle}`}
           onClick={saveAll}
@@ -409,8 +407,31 @@ export function GardenCanvas({
         </button>
       </div>
 
+      {/* Tekenen sub-toolbar */}
+      {activeTab === "tekenen" && (
+        <div className="flex flex-wrap gap-2 items-center">
+          {(["zon", "halfschaduw", "schaduw"] as ZoneType[]).map(zt => (
+            <button
+              key={zt}
+              onClick={() => { setMode("zon"); setZoneType(zt); }}
+              className={`${btnBase} ${mode === "zon" && zoneType === zt ? "ring-2 ring-[var(--color-accent-primary)]" : ""}`}
+              style={{ backgroundColor: ZONE_COLORS[zt].fill + "44", borderColor: ZONE_COLORS[zt].stroke }}
+            >
+              {zt === "zon" ? "☀ Zon" : zt === "halfschaduw" ? "⛅ Half" : "☁ Schaduw"}
+            </button>
+          ))}
+          <button className={`${btnBase} ${showGrid ? "bg-[var(--color-accent-primary)]/15 border-[var(--color-accent-primary)]/40" : btnIdle}`} onClick={() => setShowGrid(g => !g)}>⊞</button>
+          {(mode === "teken" || mode === "zon") && (
+            <button className={`${btnBase} ${btnIdle}`} onClick={undo}>↩</button>
+          )}
+          {(mode === "teken" || mode === "zon") && closed && (
+            <button className={`${btnBase} text-red-500 border-red-200 dark:border-red-900`} onClick={clearBoundary}>✕ Grens</button>
+          )}
+        </div>
+      )}
+
       {/* Zone delete buttons */}
-      {zones.length > 0 && mode === "zon" && (
+      {activeTab === "tekenen" && zones.length > 0 && mode === "zon" && (
         <div className="flex flex-wrap gap-1">
           {zones.map((z, i) => (
             <button
@@ -425,34 +446,54 @@ export function GardenCanvas({
         </div>
       )}
 
-      {/* Canvas + plant picker */}
-      <div className="flex flex-col-reverse md:flex-row gap-3 md:items-start">
-        {/* Plant picker — links op desktop, onderaan op mobiel */}
-        {mode === "plant" && (
-          <div className="w-full md:w-48 shrink-0 space-y-2 min-w-0 overflow-hidden">
+      {/* Plant picker (plant tab) + canvas */}
+      <div className={`flex gap-3 md:items-start ${activeTab === "plant" ? "flex-col md:flex-row" : "flex-col"}`}>
+
+        {/* Plant picker — boven canvas op mobiel, sidebar op desktop */}
+        {activeTab === "plant" && (
+          <div className="w-full md:w-48 shrink-0 space-y-2 min-w-0">
             <input
               type="text" placeholder="Zoek plant…" value={plantSearch}
               onChange={e => setPlantSearch(e.target.value)}
-              className="w-full max-w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] outline-none focus:border-[var(--color-accent-primary)]"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] outline-none focus:border-[var(--color-accent-primary)]"
             />
-            <div className="overflow-x-auto md:overflow-x-visible md:overflow-y-auto md:max-h-[384px]">
-              <div className="flex flex-row md:flex-col gap-2 pb-1 md:pb-0 w-max md:w-full">
+            {/* Mobiel: compact 3-koloms grid */}
+            <div className="md:hidden max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-1.5">
                 {filteredPlants.map(plant => (
                   <button
                     key={plant.id}
                     onClick={() => setSelectedPlant(plant.id)}
                     title={plant.naam}
-                    className={`flex-shrink-0 md:flex-shrink flex flex-col md:flex-row items-center gap-1 md:gap-2 px-2 py-1.5 rounded-lg border text-xs transition-colors md:w-full ${
+                    className={`flex flex-col items-center gap-0.5 px-1 py-2 rounded-lg border text-xs transition-colors ${
                       selectedPlant === plant.id
                         ? "border-[var(--color-accent-primary)] bg-[var(--color-accent-primary)]/10"
                         : "border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)]"
                     }`}
                   >
-                    <span className="text-lg">{plant.emoji}</span>
-                    <span className="max-w-[56px] md:max-w-none truncate text-[var(--color-text-muted)]">{plant.naam}</span>
+                    <span className="text-xl">{plant.emoji}</span>
+                    <span className="w-full truncate text-center text-[10px] text-[var(--color-text-muted)]">{plant.naam}</span>
                   </button>
                 ))}
               </div>
+            </div>
+            {/* Desktop: verticale lijst */}
+            <div className="hidden md:flex flex-col gap-2 overflow-y-auto max-h-[384px]">
+              {filteredPlants.map(plant => (
+                <button
+                  key={plant.id}
+                  onClick={() => setSelectedPlant(plant.id)}
+                  title={plant.naam}
+                  className={`flex flex-row items-center gap-2 px-2 py-1.5 rounded-lg border text-xs transition-colors w-full ${
+                    selectedPlant === plant.id
+                      ? "border-[var(--color-accent-primary)] bg-[var(--color-accent-primary)]/10"
+                      : "border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)]"
+                  }`}
+                >
+                  <span className="text-lg">{plant.emoji}</span>
+                  <span className="truncate text-[var(--color-text-muted)]">{plant.naam}</span>
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -461,7 +502,7 @@ export function GardenCanvas({
         <div
           className="flex-1 min-w-0 w-full rounded-xl overflow-hidden border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[#eef5e8] dark:bg-[#1a2a15]"
           style={{ height: 420 }}
-      >
+        >
         <svg
           ref={svgRef}
           width="100%" height="100%"
@@ -515,8 +556,8 @@ export function GardenCanvas({
                 const next = boundaryPts[(i + 1) % boundaryPts.length];
                 return <AfmetingLabel key={i} a={p} b={next} />;
               })}
-              {/* Draggable vertex handles */}
-              {boundaryPts.map((p, i) => (
+              {/* Draggable vertex handles — alleen in tekenen tab */}
+              {activeTab === "tekenen" && boundaryPts.map((p, i) => (
                 <circle key={i} cx={p.x} cy={p.y} r={7}
                   fill="white" stroke="#5a9a30" strokeWidth="2"
                   style={{ cursor: mode === "teken" ? "move" : "default" }}
@@ -553,9 +594,10 @@ export function GardenCanvas({
             const hasTask = (plant.v[currentMonth as keyof typeof plant.v]?.length ?? 0) > 0;
             const selected = selectedPlacementId === p.id;
             const popupOffsetX = (p.x - vbMinX > vbW - 140) ? -120 : 20;
-            const popupOffsetY = (p.y - vbMinY < 60) ? 15 : -55;
+            const popupOffsetY = (p.y - vbMinY < 70) ? 15 : -65;
             return (
-              <g key={p.id} transform={`translate(${p.x},${p.y})`} style={{ cursor: "grab" }}
+              <g key={p.id} transform={`translate(${p.x},${p.y})`}
+                style={{ cursor: mode === "view" ? "pointer" : "grab" }}
                 onMouseDown={e => handlePlantMouseDown(e, p)}
                 onClick={e => handlePlantClick(e, p)}
                 onTouchStart={e => handlePlantTouchStart(e, p)}
@@ -569,8 +611,32 @@ export function GardenCanvas({
                 {hasTask && <circle cx={12} cy={-12} r={5} fill="#e85d04" pointerEvents="none" />}
                 {p.in_pot && <text x={-17} y={17} fontSize="9" style={{ userSelect: "none", pointerEvents: "none" }}>🪴</text>}
 
-                {/* Popover */}
-                {selected && (
+                {/* Popup — bekijken modus */}
+                {selected && mode === "view" && (
+                  <g transform={`translate(${popupOffsetX},${popupOffsetY})`} style={{ pointerEvents: "auto" }}>
+                    <rect x={0} y={0} width={120} height={60} rx={8}
+                      fill="white" stroke="#e5e7eb" strokeWidth="1" filter="url(#pshadow)" />
+                    <text x={8} y={16} fontSize="10" fontWeight="600" fill="#111"
+                      style={{ userSelect: "none", pointerEvents: "none" }}>
+                      {plant.naam}
+                    </text>
+                    <text x={8} y={30} fontSize="9" fill="#888"
+                      style={{ userSelect: "none", pointerEvents: "none" }}>
+                      {p.in_pot ? "🪴 in pot" : "🌍 in de grond"}
+                    </text>
+                    <g onClick={e => { e.stopPropagation(); router.push(`/planten/${plant.id}`); }} style={{ cursor: "pointer" }}>
+                      <rect x={6} y={36} width={108} height={18} rx={5}
+                        fill="#f0fdf4" stroke="#5a9a30" strokeWidth="0.8" />
+                      <text x={60} y={48} textAnchor="middle" fontSize="9" fill="#5a9a30"
+                        style={{ userSelect: "none", pointerEvents: "none" }}>
+                        Meer info →
+                      </text>
+                    </g>
+                  </g>
+                )}
+
+                {/* Popup — bewerken modus */}
+                {selected && mode !== "view" && (
                   <g transform={`translate(${popupOffsetX},${popupOffsetY})`} style={{ pointerEvents: "auto" }}>
                     <rect x={0} y={0} width={110} height={52} rx={8}
                       fill="white" stroke="#e5e7eb" strokeWidth="1"
