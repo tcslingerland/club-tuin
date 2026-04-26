@@ -387,6 +387,22 @@ export function GardenCanvas({
     mode === "plant" ? "Tik in de tuin om te plaatsen · tik op plant voor opties" :
     "Tik op een plant voor pot-toggle of verwijderen";
 
+  const plantLijst = (() => {
+    const counts: Record<number, number> = {};
+    const plantsMap = new Map<number, typeof plantenDb[0]>();
+    for (const p of placements) {
+      const plant = plantenDb.find(pl => pl.id === p.plant_id);
+      if (plant) {
+        counts[plant.id] = (counts[plant.id] ?? 0) + 1;
+        plantsMap.set(plant.id, plant);
+      }
+    }
+    return {
+      planten: [...plantsMap.values()].sort((a, b) => a.naam.localeCompare(b.naam, "nl")),
+      counts,
+    };
+  })();
+
   const btnBase = "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border";
   const btnActive = "bg-[var(--color-accent-primary)] text-white border-[var(--color-accent-primary)]";
   const btnIdle = "bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] border-[#b0b8a8] dark:border-[var(--color-border-dark)] text-[var(--color-text)] dark:text-[var(--color-text-dark)]";
@@ -669,6 +685,33 @@ export function GardenCanvas({
         </svg>
         </div>
       </div>
+
+      {/* Plantenlijst — alleen in bekijken tab */}
+      {activeTab === "view" && plantLijst.planten.length > 0 && (
+        <div className="pt-2 space-y-2">
+          <p className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide px-1">
+            Geplante planten ({plantLijst.planten.length})
+          </p>
+          <div className="flex flex-col gap-1">
+            {plantLijst.planten.map(plant => (
+              <button
+                key={plant.id}
+                onClick={() => router.push(`/planten/${plant.id}`)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] text-left hover:border-[var(--color-accent-primary)] transition-colors w-full"
+              >
+                <span className="text-xl shrink-0">{plant.emoji}</span>
+                <span className="text-sm flex-1 text-[var(--color-text)] dark:text-[var(--color-text-dark)]">{plant.naam}</span>
+                {plantLijst.counts[plant.id] > 1 && (
+                  <span className="text-xs text-[var(--color-text-muted)] border border-[var(--color-border)] dark:border-[var(--color-border-dark)] px-1.5 py-0.5 rounded-full shrink-0">
+                    ×{plantLijst.counts[plant.id]}
+                  </span>
+                )}
+                <span className="text-xs text-[var(--color-text-muted)] shrink-0">→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Hint */}
       <p className="text-xs text-center text-[var(--color-text-muted)]">{hint}</p>
