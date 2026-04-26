@@ -355,7 +355,7 @@ export function GardenCanvas({
       {/* Toolbar — twee rijen op mobiel */}
       <div className="flex flex-wrap gap-2 items-center">
         <button className={`${btnBase} ${mode === "teken" ? btnActive : btnIdle}`} onClick={() => setMode("teken")}>✎ Tekenen</button>
-        {(["zon", "halfschaduw", "schaduw"] as ZoneType[]).map(zt => (
+        {(mode === "teken" || mode === "zon") && (["zon", "halfschaduw", "schaduw"] as ZoneType[]).map(zt => (
           <button
             key={zt}
             onClick={() => { setMode("zon"); setZoneType(zt); }}
@@ -370,7 +370,7 @@ export function GardenCanvas({
         {(mode === "teken" || mode === "zon") && (
           <button className={`${btnBase} ${btnIdle}`} onClick={undo}>↩</button>
         )}
-        {closed && (
+        {(mode === "teken" || mode === "zon") && closed && (
           <button className={`${btnBase} text-red-500 border-red-200 dark:border-red-900`} onClick={clearBoundary}>✕ Grens</button>
         )}
       </div>
