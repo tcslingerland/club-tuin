@@ -392,14 +392,14 @@ export function GardenCanvas({
       )}
 
       {/* Canvas + plant picker */}
-      <div className="flex flex-col-reverse md:flex-row gap-3 items-start">
+      <div className="flex flex-col-reverse md:flex-row gap-3 md:items-start">
         {/* Plant picker — links op desktop, onderaan op mobiel */}
         {mode === "plant" && (
-          <div className="w-full md:w-48 shrink-0 space-y-2">
+          <div className="w-full md:w-48 shrink-0 space-y-2 min-w-0 overflow-hidden">
             <input
               type="text" placeholder="Zoek plant…" value={plantSearch}
               onChange={e => setPlantSearch(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] outline-none focus:border-[var(--color-accent-primary)]"
+              className="w-full max-w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-dark)] outline-none focus:border-[var(--color-accent-primary)]"
             />
             <div className="overflow-x-auto md:overflow-x-visible md:overflow-y-auto md:max-h-[384px]">
               <div className="flex flex-row md:flex-col gap-2 pb-1 md:pb-0 w-max md:w-full">
@@ -425,7 +425,7 @@ export function GardenCanvas({
 
         {/* SVG Canvas */}
         <div
-          className="flex-1 min-w-0 rounded-xl overflow-hidden border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[#eef5e8] dark:bg-[#1a2a15]"
+          className="flex-1 min-w-0 w-full rounded-xl overflow-hidden border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[#eef5e8] dark:bg-[#1a2a15]"
           style={{ height: 420 }}
       >
         <svg

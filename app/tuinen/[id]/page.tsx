@@ -100,36 +100,34 @@ export default async function GardenDetailPage({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Card>
-          <CardContent className="py-4 text-center">
+          <CardContent className="py-3 px-4 flex items-center gap-3 sm:py-4 sm:px-5 sm:block sm:text-center">
             <p className="text-2xl font-display text-[var(--color-accent-primary)]">
               {plantCount}
             </p>
-            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+            <p className="text-xs text-[var(--color-text-muted)] sm:mt-0.5">
               {plantCount === 1 ? "plant" : "planten"}
             </p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="py-4 text-center">
-            <div className="flex justify-center mb-1">
-              <svg viewBox="0 0 80 80" width="56" height="56">
-                <circle cx="40" cy="40" r="34" fill="none" stroke="#e5e7eb" strokeWidth="6" />
-                <circle
-                  cx="40" cy="40" r="34" fill="none"
-                  stroke={biodivRingColor} strokeWidth="6"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={plantCount === 0 ? circumference : strokeDashoffset}
-                  strokeLinecap="round"
-                  transform="rotate(-90 40 40)"
-                  style={{ transition: "stroke-dashoffset 0.6s ease" }}
-                />
-                <text x="40" y="44" textAnchor="middle" fontSize="14" fontWeight="600" fill={biodivRingColor}>
-                  {plantCount === 0 ? "—" : biodiv.totaal}
-                </text>
-              </svg>
-            </div>
+          <CardContent className="py-3 px-4 flex items-center gap-3 sm:py-4 sm:px-5 sm:flex-col sm:items-center">
+            <svg viewBox="0 0 80 80" width="48" height="48" className="shrink-0">
+              <circle cx="40" cy="40" r="34" fill="none" stroke="#e5e7eb" strokeWidth="6" />
+              <circle
+                cx="40" cy="40" r="34" fill="none"
+                stroke={biodivRingColor} strokeWidth="6"
+                strokeDasharray={circumference}
+                strokeDashoffset={plantCount === 0 ? circumference : strokeDashoffset}
+                strokeLinecap="round"
+                transform="rotate(-90 40 40)"
+                style={{ transition: "stroke-dashoffset 0.6s ease" }}
+              />
+              <text x="40" y="44" textAnchor="middle" fontSize="14" fontWeight="600" fill={biodivRingColor}>
+                {plantCount === 0 ? "—" : biodiv.totaal}
+              </text>
+            </svg>
             <p className="text-xs text-[var(--color-text-muted)]">biodiversiteit</p>
           </CardContent>
         </Card>
