@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { GettingStartedCard } from "@/components/GettingStartedCard";
+import { plantenDb } from "@/lib/plants";
+import type { Plant } from "@/lib/plants/types";
+import { berekenBiodiversiteit, biodivKleur } from "@/lib/biodiversiteit";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -105,6 +108,33 @@ export default async function DashboardPage() {
         .in("garden_id", gardenIds)
     : { count: 0 };
 
+  // Dashboard stats
+  const { data: allPlacements } = gardenIds.length > 0
+    ? await supabase.from("plant_placements").select("plant_id").in("garden_id", gardenIds)
+    : { data: [] as { plant_id: number }[] };
+
+  const currentMonth = new Date().getMonth() + 1;
+  const maandNamen = ["Januari","Februari","Maart","April","Mei","Juni","Juli","Augustus","September","Oktober","November","December"];
+  const maandNaam = maandNamen[currentMonth - 1];
+
+  const uniquePlantIds = [...new Set((allPlacements ?? []).map(p => p.plant_id))];
+  const planten = uniquePlantIds
+    .map(id => plantenDb.find(p => p.id === id))
+    .filter((p): p is Plant => p !== undefined);
+
+  const biodiv = berekenBiodiversiteit(planten);
+  const ringKleur = biodivKleur(biodiv.totaal);
+  const circumference = 2 * Math.PI * 34;
+  const strokeDashoffset = circumference - (biodiv.totaal / 100) * circumference;
+
+  const plantenMetTaken = planten.filter(p =>
+    ((p.v as Record<number, string[]>)[currentMonth] ?? []).length > 0
+  ).length;
+
+  const bloeiend = planten.filter(p =>
+    ((p.v as Record<number, string[]>)[currentMonth] ?? []).some((t: string) => /bloei|bloesem/i.test(t))
+  );
+
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-8 space-y-6">
       {/* Header */}
@@ -121,6 +151,68 @@ export default async function DashboardPage() {
 
       {/* Getting started */}
       <GettingStartedCard gardenCount={gardenCount} plantCount={plantCount ?? 0} />
+
+      {/* Dashboard stats — only when there are plants */}
+      {planten.length > 0 && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            {/* Taken shortcut */}
+            <Link href="/taken">
+              <Card className="hover:border-[var(--color-accent-primary)]/40 transition-colors cursor-pointer h-full">
+                <CardContent className="py-4 px-4">
+                  <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide mb-2">{maandNaam}</p>
+                  <p className="font-display text-3xl text-[var(--color-accent-primary)] leading-none">{plantenMetTaken}</p>
+                  <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                    {plantenMetTaken === 1 ? "plant vraagt" : "planten vragen"} aandacht
+                  </p>
+                  <p className="text-xs text-[var(--color-accent-primary)] mt-3">Naar kalender →</p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Biodiversiteit shortcut */}
+            <Link href="/biodiversiteit">
+              <Card className="hover:border-[var(--color-accent-primary)]/40 transition-colors cursor-pointer h-full">
+                <CardContent className="py-4 px-4 flex flex-col items-center justify-center gap-1">
+                  <svg viewBox="0 0 80 80" width="60" height="60">
+                    <circle cx="40" cy="40" r="34" fill="none" stroke="#e5e7eb" strokeWidth="6" />
+                    <circle
+                      cx="40" cy="40" r="34" fill="none"
+                      stroke={ringKleur} strokeWidth="6"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      transform="rotate(-90 40 40)"
+                    />
+                    <text x="40" y="37" textAnchor="middle" fontSize="15" fontWeight="700" fill={ringKleur}>{biodiv.totaal}</text>
+                    <text x="40" y="50" textAnchor="middle" fontSize="9" fill="#9ca3af">/100</text>
+                  </svg>
+                  <p className="text-xs text-[var(--color-text-muted)]">biodiversiteit</p>
+                  <p className="text-xs text-[var(--color-accent-primary)]">Meer info →</p>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+
+          {/* Bloeiende planten */}
+          {bloeiend.length > 0 && (
+            <Card>
+              <CardContent className="py-3 px-4">
+                <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide mb-2">In bloei — {maandNaam}</p>
+                <div className="flex flex-wrap gap-2">
+                  {bloeiend.map(p => (
+                    <Link key={p.id} href={`/planten/${p.id}`}>
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-[var(--color-accent-primary)]/8 text-[var(--color-accent-primary)] hover:bg-[var(--color-accent-primary)]/15 transition-colors">
+                        {p.emoji} {p.naam}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Recent gardens */}
       {gardens && gardens.length > 0 && (
