@@ -516,7 +516,7 @@ export function GardenCanvas({
 
         {/* SVG Canvas */}
         <div
-          className="flex-1 min-w-0 w-full rounded-xl overflow-hidden border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[#eef5e8] dark:bg-[#1a2a15]"
+          className="flex-1 min-w-0 w-full rounded-xl overflow-hidden border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[#eef5e8] dark:bg-[#1a2a15] relative"
           style={{ height: 420 }}
         >
         <svg
@@ -651,38 +651,52 @@ export function GardenCanvas({
                   </g>
                 )}
 
-                {/* Popup — bewerken modus */}
+                {/* Popup — bewerken modus: alleen naam label */}
                 {selected && mode !== "view" && (
-                  <g transform={`translate(${popupOffsetX},${popupOffsetY})`} style={{ pointerEvents: "auto" }}>
-                    <rect x={0} y={0} width={110} height={52} rx={8}
-                      fill="white" stroke="#e5e7eb" strokeWidth="1"
-                      filter="url(#pshadow)" />
-                    <text x={8} y={16} fontSize="10" fontWeight="600" fill="#111"
-                      style={{ userSelect: "none", pointerEvents: "none" }}>
+                  <g transform={`translate(${popupOffsetX},${popupOffsetY + 20})`} pointerEvents="none">
+                    <rect x={0} y={0} width={90} height={18} rx={5}
+                      fill="white" stroke="#e5e7eb" strokeWidth="1" />
+                    <text x={45} y={12} textAnchor="middle" fontSize="10" fontWeight="600" fill="#111"
+                      style={{ userSelect: "none" }}>
                       {plant.naam}
                     </text>
-                    <g onClick={e => { e.stopPropagation(); toggleInPot(p.id); }} style={{ cursor: "pointer" }}>
-                      <rect x={6} y={22} width={46} height={22} rx={5}
-                        fill={p.in_pot ? "#FDF0EA" : "#f0fdf4"} stroke={p.in_pot ? "#D4784A" : "#5a9a30"} strokeWidth="1" />
-                      <text x={29} y={37} textAnchor="middle" fontSize="10" fill={p.in_pot ? "#D4784A" : "#5a9a30"}
-                        style={{ userSelect: "none", pointerEvents: "none" }}>
-                        {p.in_pot ? "🪴 Pot" : "🌍 Grond"}
-                      </text>
-                    </g>
-                    <g onClick={e => { e.stopPropagation(); removePlacement(p.id); }} style={{ cursor: "pointer" }}>
-                      <rect x={58} y={22} width={46} height={22} rx={5}
-                        fill="#fff5f5" stroke="#fca5a5" strokeWidth="1" />
-                      <text x={81} y={37} textAnchor="middle" fontSize="10" fill="#dc2626"
-                        style={{ userSelect: "none", pointerEvents: "none" }}>
-                        ✕ Weg
-                      </text>
-                    </g>
                   </g>
                 )}
               </g>
             );
           })}
         </svg>
+
+        {/* HTML actiebalk — verschijnt onderaan canvas als plant geselecteerd is in plant-modus */}
+        {selectedPlacementId && mode !== "view" && (() => {
+          const sel = placements.find(p => p.id === selectedPlacementId);
+          const plant = sel ? plantenDb.find(pl => pl.id === sel.plant_id) : null;
+          if (!plant || !sel) return null;
+          return (
+            <div className="absolute bottom-0 left-0 right-0 bg-white/95 dark:bg-[#1e2a1a]/95 backdrop-blur-sm border-t border-[var(--color-border)] dark:border-[var(--color-border-dark)] rounded-b-xl px-4 py-3 flex items-center gap-3">
+              <span className="text-2xl shrink-0">{plant.emoji}</span>
+              <span className="text-sm font-medium flex-1 text-[var(--color-text)] dark:text-[var(--color-text-dark)] truncate">{plant.naam}</span>
+              <button
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); toggleInPot(sel.id); }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors shrink-0 ${
+                  sel.in_pot
+                    ? "bg-[#FDF0EA] border-[#D4784A] text-[#D4784A]"
+                    : "bg-[#f0fdf4] border-[#5a9a30] text-[#5a9a30]"
+                }`}
+              >
+                {sel.in_pot ? "🪴 Pot" : "🌍 Grond"}
+              </button>
+              <button
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); removePlacement(sel.id); }}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 transition-colors shrink-0"
+              >
+                ✕ Verwijderen
+              </button>
+            </div>
+          );
+        })()}
         </div>
       </div>
 
