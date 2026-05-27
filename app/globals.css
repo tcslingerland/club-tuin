@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-/* ── Design System: Club Tuin ── */
+/* ── Design System: Bloeiclub ── */
 :root {
-  /* Base — warmer cream from Club Tuin */
+  /* Base — warmer cream from Bloeiclub */
   --color-base: #F0EDE8;
   --color-base-dark: #0f1710;
   --color-surface: #E8E4DE;
@@ -14,7 +14,7 @@
   --color-text-dark: #EAF0EA;
   --color-text-muted-dark: #7A9080;
 
-  /* Accents — Club Tuin palette */
+  /* Accents — Bloeiclub palette */
   --color-accent-primary: #4A7A5C;       /* muted forest green — replaces blue */
   --color-accent-primary-hover: #3d6b4f;
   --color-accent-cta: #D4784A;           /* burnt orange — matches coffee app's terracotta */

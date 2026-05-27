@@ -17,7 +17,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Club Tuin",
+  title: "Bloeiclub",
   description: "Plan en beheer jouw tuin — planten, taken en biodiversiteit",
   icons: { icon: "/logo-mark.svg" },
 };

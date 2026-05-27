@@ -98,7 +98,7 @@ function LoginPageInner() {
             <span className="text-6xl">🌿</span>
           </div>
           <h1 className="font-display text-3xl text-[var(--color-text)] dark:text-[var(--color-text-dark)] mb-1">
-            Club Tuin
+            Bloeiclub
           </h1>
           <p className="text-sm text-[var(--color-text-muted)]">
             {mode === "signin" ? "Inloggen op je account" : "Maak een account aan"}

@@ -59,7 +59,7 @@ export function SideNav() {
         <div className="flex items-center gap-2">
           <span className="text-2xl leading-none">🌿</span>
           <h1 className="font-display text-xl tracking-tight text-[var(--color-text)] dark:text-[var(--color-text-dark)]">
-            Club Tuin
+            Bloeiclub
           </h1>
         </div>
         <DarkModeToggle />
